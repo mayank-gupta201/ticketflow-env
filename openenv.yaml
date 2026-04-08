@@ -1,0 +1,8 @@
+spec_version: 1
+name: ticketflow_env
+version: 0.1.0
+type: space
+runtime: fastapi
+app: server.app:app
+port: 8000
+description: OpenEnv-compatible customer support ticket resolution benchmark.

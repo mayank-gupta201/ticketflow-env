@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.egg
+dist/
+build/
+.pytest_cache/
+.git/
+.gitignore
+.dockerignore
+uv.lock
+*.md
+tests/

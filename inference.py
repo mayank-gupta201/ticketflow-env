@@ -18,19 +18,19 @@ SYSTEM_PROMPT = """\
 You are a careful customer support operations agent handling one ticket at a time.
 
 ## Workflow (follow this exact order)
-1. **classify_issue** — Always do this first. Set metadata.label to one of: damaged_item, account_access_issue, refund_request.
-2. **investigate** (Optional) — If issue is account_access_issue or if information is missing, use request_more_info. Wait for the customer to reply.
-3. **resolve** — Take one resolution action based on policy:
+1. **classify_issue**  Always do this first. Set metadata.label to one of: damaged_item, account_access_issue, refund_request.
+2. **investigate** (Optional)  If issue is account_access_issue or if information is missing, use request_more_info. Wait for the customer to reply.
+3. **resolve**  Take one resolution action based on policy:
    - damaged_item (<=30 days, or <=60 days for VIP) -> approve_refund
    - refund_request (<=30 days, or <=60 days for VIP) -> approve_refund
    - order_value > 1000 or customer_tier == 'suspicious' -> escalate_to_human (no refunds allowed)
    - out of policy -> deny_refund or offer_store_credit
-4. **reply** — Use send_customer_reply to explain the action taken. Follow this reply structure:
+4. **reply**  Use send_customer_reply to explain the action taken. Follow this reply structure:
    - Start with empathy (e.g., "I understand your concern...")
    - Clearly explain the reason using policy (e.g., "Since your order is within our 30-day refund window...")
    - Offer an alternative solution if applicable (e.g., "We have added store credit to your account as an alternative.")
    - Keep the tone professional, helpful, and concise
-5. **close** — Use close_ticket after replying (except for account_access_issue & incomplete_info, which stay open after reply wait state).
+5. **close**  Use close_ticket after replying (except for account_access_issue & incomplete_info, which stay open after reply wait state).
 
 ## Reply Quality Rules
 - NEVER send a vague reply like "We cannot process refund" or "Here is a reply about your ticket."
@@ -132,7 +132,7 @@ def _build_contextual_reply(observation: TicketFlowObservation) -> str:
             "This will help us investigate and get you back on track right away."
         )
 
-    # Fallback — should not normally be reached
+    # Fallback  should not normally be reached
     return (
         "Thank you for contacting us. We've reviewed your request and taken the appropriate action. "
         "If you have any further questions or concerns, please don't hesitate to reach out. "
@@ -209,7 +209,7 @@ def _model_action(
         if not parsed:
             return _heuristic_action(observation)
         action_type = parsed.get("action_type", "")
-        # Reject LLM action if it's not in the valid set — avoid -0.30 penalty
+        # Reject LLM action if it's not in the valid set  avoid -0.30 penalty
         if action_type not in observation.available_actions:
             return _heuristic_action(observation)
         return TicketFlowAction.model_validate(

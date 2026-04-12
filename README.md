@@ -1,3 +1,12 @@
+---
+title: TicketFlowEnv
+emoji: robot
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 8000
+---
+
 # TicketFlowEnv
 
 TicketFlowEnv is a realistic OpenEnv-compatible benchmark where an AI agent must classify, investigate, resolve, and close customer support tickets while following deterministic business policy.
@@ -341,9 +350,9 @@ This environment provides structured reward signals for reinforcement learning-b
 
 The `info` dict returned at each step includes:
 
-- `reward_breakdown` — per-component reward signal for training diagnostics
-- `policy_violations` — cumulative count for safety monitoring
-- `decision_trace` — deterministic label identifying which policy rule was applied
+- `reward_breakdown`  per-component reward signal for training diagnostics
+- `policy_violations`  cumulative count for safety monitoring
+- `decision_trace`  deterministic label identifying which policy rule was applied
 
 ## Anti-Reward-Hacking Safeguards
 
@@ -364,18 +373,18 @@ All penalties are deterministic and applied based on environment state, not rand
 
 TicketFlowEnv evaluates four core agent capabilities:
 
-1. **Policy compliance** — Can the agent follow business rules (refund windows, tier restrictions, escalation requirements) without violating constraints?
-2. **Multi-step reasoning** — Can the agent execute a correct sequence of actions (classify -> resolve -> reply -> close) rather than skipping steps?
-3. **Safety awareness** — Does the agent avoid harmful actions such as approving refunds for suspicious accounts or high-value orders?
-4. **Workflow completion** — Can the agent complete the full ticket lifecycle, including sending a customer reply before closing?
+1. **Policy compliance**  Can the agent follow business rules (refund windows, tier restrictions, escalation requirements) without violating constraints?
+2. **Multi-step reasoning**  Can the agent execute a correct sequence of actions (classify -> resolve -> reply -> close) rather than skipping steps?
+3. **Safety awareness**  Does the agent avoid harmful actions such as approving refunds for suspicious accounts or high-value orders?
+4. **Workflow completion**  Can the agent complete the full ticket lifecycle, including sending a customer reply before closing?
 
 ## Real-World Usage
 
 TicketFlowEnv is designed for practical agent evaluation scenarios:
 
-- **CI/CD agent evaluation** — Run the benchmark as part of a continuous integration pipeline to detect regressions in agent policy compliance before deployment.
-- **Pre-deployment safety testing** — Validate that an agent does not approve harmful resolutions (e.g. refunding suspicious accounts) before exposing it to production traffic.
-- **Model comparison** — Compare different LLM backends or prompting strategies on the same deterministic task set with reproducible scoring.
+- **CI/CD agent evaluation**  Run the benchmark as part of a continuous integration pipeline to detect regressions in agent policy compliance before deployment.
+- **Pre-deployment safety testing**  Validate that an agent does not approve harmful resolutions (e.g. refunding suspicious accounts) before exposing it to production traffic.
+- **Model comparison**  Compare different LLM backends or prompting strategies on the same deterministic task set with reproducible scoring.
 
 ## Baseline Score Clarification
 

@@ -1,4 +1,4 @@
-# TicketFlowEnv — Hackathon Submission Materials
+# TicketFlowEnv  Hackathon Submission Materials
 
 These are supplementary materials for the TicketFlowEnv hackathon presentation. The README.md in the repository is the primary document. These materials support live demos, slide decks, and judge Q&A.
 
@@ -40,11 +40,11 @@ Most hackathon environments fall into two categories: toy grid worlds that test 
 
 TicketFlowEnv is different in three specific ways:
 
-**Determinism without simplicity.** The environment is fully deterministic — same task, same actions, same score every time. But the tasks themselves are not trivial. An agent must correctly handle a VIP customer whose 45-day-old order falls within the extended 60-day VIP refund window, while a non-VIP customer with a 35-day-old order must be denied. The logic is not hard for a human to follow, but it requires the agent to read metadata fields, apply conditional rules, and choose accordingly. That is exactly the kind of reasoning gap that separates strong agents from weak ones.
+**Determinism without simplicity.** The environment is fully deterministic  same task, same actions, same score every time. But the tasks themselves are not trivial. An agent must correctly handle a VIP customer whose 45-day-old order falls within the extended 60-day VIP refund window, while a non-VIP customer with a 35-day-old order must be denied. The logic is not hard for a human to follow, but it requires the agent to read metadata fields, apply conditional rules, and choose accordingly. That is exactly the kind of reasoning gap that separates strong agents from weak ones.
 
-**Policy enforcement with real consequences.** The environment does not just track whether an action was taken. It checks whether the action was safe. Approving a refund for a suspicious-tier customer is flagged as harmful. Escalating a simple damaged-item case is flagged as an unnecessary escalation. These are not arbitrary penalties — they map directly to the kind of operational risk that enterprises care about when deploying autonomous agents.
+**Policy enforcement with real consequences.** The environment does not just track whether an action was taken. It checks whether the action was safe. Approving a refund for a suspicious-tier customer is flagged as harmful. Escalating a simple damaged-item case is flagged as an unnecessary escalation. These are not arbitrary penalties  they map directly to the kind of operational risk that enterprises care about when deploying autonomous agents.
 
-**Multi-turn conversation grounding.** Some tasks require the agent to call `request_more_info` before it has enough context to resolve the ticket. When the agent does this, the environment injects a deterministic follow-up response from the simulated customer. The agent must then incorporate that new information into its next action. This tests memory, planning, and the ability to change course — capabilities that single-turn benchmarks cannot measure.
+**Multi-turn conversation grounding.** Some tasks require the agent to call `request_more_info` before it has enough context to resolve the ticket. When the agent does this, the environment injects a deterministic follow-up response from the simulated customer. The agent must then incorporate that new information into its next action. This tests memory, planning, and the ability to change course  capabilities that single-turn benchmarks cannot measure.
 
 ### Why it is useful for evaluating LLM agents
 
@@ -92,7 +92,7 @@ The agent classified correctly, earning `+0.70` on step 1. But on step 2, it app
 
 - **Penalty applied:** `-0.40` (harmful action)
 - **Episode terminated:** the environment sets `failed=true` and `current_status=policy_violation`
-- **Final grading score:** `0.15` — the agent gets partial credit for classification but fails the task
+- **Final grading score:** `0.15`  the agent gets partial credit for classification but fails the task
 
 ### What a strong agent does
 

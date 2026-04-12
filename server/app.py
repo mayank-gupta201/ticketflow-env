@@ -3,7 +3,7 @@ OpenEnv-compliant server entry point.
 
 This shim re-exports the FastAPI ``app`` from the main package so that
 ``openenv validate`` finds ``server/app.py`` at the project root *and* a
-callable ``main()`` function — both are hard requirements of the multi-mode
+callable ``main()`` function  both are hard requirements of the multi-mode
 deployment validator.
 
 Usage:

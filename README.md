@@ -1,6 +1,6 @@
 ---
 title: TicketFlowEnv
-emoji: robot
+emoji: "🤖"
 colorFrom: indigo
 colorTo: purple
 sdk: docker

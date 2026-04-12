@@ -63,6 +63,8 @@ class TicketFlowObservation(ObservationBase):
     available_actions: List[str] = Field(default_factory=list)
     current_status: str
     last_action_result: Optional[str] = None
+    payment_method: Optional[str] = None
+    delivery_partner: Optional[str] = None
 
 
 class TicketFlowState(StateBase):
@@ -84,6 +86,9 @@ class TicketFlowState(StateBase):
     task_id: str
     step_count: int = 0
     current_status: str = "open"
+    customer_tier: str = "basic"
+    order_value: float = 0.0
+    order_age_days: int = 0
     last_action_result: Optional[str] = None
     classification_label: Optional[str] = None
     resolution_action: Optional[str] = None

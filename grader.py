@@ -100,4 +100,4 @@ def grade_task(task_id: str, state: TicketFlowState, action_history: List[Ticket
         return grade_account_access_ambiguity(state, action_history)
     if task_id == "out_of_policy_refund":
         return grade_out_of_policy_refund(state, action_history)
-    raise ValueError(f"Unknown task_id for grading: {task_id}")
+    return {"score": 0.0, "reason": f"No grading logic defined for task: {task_id}"}

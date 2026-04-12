@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 
 def clamp_reward(value: float) -> float:
@@ -21,43 +21,48 @@ def compute_step_reward(
     redundant: bool,
     unnecessary_escalation: bool,
     premature_close: bool,
+    context: Optional[Dict[str, Any]] = None,
 ) -> Tuple[float, Dict[str, float | bool]]:
-    reward = 0.0
-    details: Dict[str, float | bool] = {
-        "valid_action": valid_action,
-        "correct_classification": correct_classification,
-        "correct_workflow": correct_workflow,
-        "policy_compliant": policy_compliant,
-        "resolution_credit": resolution_credit,
-        "helpful_reply": helpful_reply,
-        "harmful": harmful,
-        "redundant": redundant,
-        "unnecessary_escalation": unnecessary_escalation,
-        "premature_close": premature_close,
-    }
-
-    if correct_classification:
-        reward += 0.20
-    if correct_workflow:
-        reward += 0.25
-    if policy_compliant:
-        reward += 0.20
-    if resolution_credit > 0.0:
-        reward += 0.25 * resolution_credit
-    if helpful_reply:
-        reward += 0.10
-
+    classification = 0.3 if correct_classification else 0.0
+    policy_compliance = 0.3 if policy_compliant else 0.0
+    response_quality = (0.2 * resolution_credit) + (0.1 if helpful_reply else 0.0)
+    efficiency = 0.1 if correct_workflow else 0.0
+    
+    penalty = 0.0
     if not valid_action:
-        reward -= 0.30
+        penalty -= 0.30
     if harmful:
-        reward -= 0.40
+        penalty -= 0.40
     if redundant:
-        reward -= 0.10
+        penalty -= 0.10
     if unnecessary_escalation:
-        reward -= 0.15
+        penalty -= 0.15
     if premature_close:
-        reward -= 0.25
+        penalty -= 0.30
 
-    reward = clamp_reward(reward)
-    details["reward"] = reward
-    return reward, details
+    # Anti-reward-hacking: penalize consecutive identical actions
+    repeated_action = bool(context and context.get("repeated_action"))
+    if repeated_action:
+        penalty -= 0.20
+
+    base_reward = classification + policy_compliance + response_quality + efficiency + penalty
+
+    # Efficiency bonus: reward agents that complete tasks in fewer steps
+    efficiency_bonus = 0.0
+    if context and "step_count" in context and "max_steps" in context:
+        step_efficiency = max(0.0, 1.0 - (context["step_count"] / context["max_steps"]))
+        efficiency_bonus = round(0.05 * step_efficiency, 4)
+
+    total_reward = clamp_reward(base_reward + efficiency_bonus)
+
+    details: Dict[str, float | bool] = {
+        "classification": classification,
+        "policy_compliance": policy_compliance,
+        "response_quality": round(response_quality, 4),
+        "efficiency": efficiency,
+        "penalty": round(penalty, 4),
+        "efficiency_bonus": efficiency_bonus,
+        "repeated_action": repeated_action,
+        "reward": total_reward,
+    }
+    return total_reward, details

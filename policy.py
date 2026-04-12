@@ -50,8 +50,11 @@ def expected_next_actions(state: TicketFlowState) -> Set[str]:
             return {"send_customer_reply"}
         return set()
     if state.issue_type == "refund_request":
+        if state.customer_tier == "suspicious" or state.order_value > 1000:
+            if state.resolution_action is None:
+                return {"escalate_to_human", "deny_refund"}
         if state.resolution_action is None:
-            return {"deny_refund", "offer_store_credit", "escalate_to_human"}
+            return {"approve_refund", "deny_refund", "offer_store_credit", "escalate_to_human"}
         if not state.reply_sent:
             return {"send_customer_reply"}
         if not state.closed:
@@ -66,15 +69,23 @@ def is_policy_compliant(action_type: str, state: TicketFlowState) -> bool:
     if action_type == "request_more_info":
         return state.issue_type == "account_access_issue"
     if action_type == "approve_refund":
+        if state.customer_tier == "suspicious": return False
+        if state.order_value > 1000: return False
+        max_days = 60 if state.customer_tier == "vip" else 30
+        if state.order_age_days > max_days: return False
         return state.refund_allowed
     if action_type == "deny_refund":
+        if state.customer_tier == "suspicious" or state.order_value > 1000: return True
+        max_days = 60 if state.customer_tier == "vip" else 30
+        if state.order_age_days > max_days: return True
         return state.issue_type == "refund_request" and not state.refund_allowed
     if action_type == "offer_replacement":
         return state.issue_type == "damaged_item" and state.replacement_allowed
     if action_type == "offer_store_credit":
-        return state.issue_type == "refund_request" and not state.refund_allowed
+        if state.customer_tier == "suspicious": return False
+        return (state.issue_type == "refund_request" and not state.refund_allowed) or (state.order_age_days > 30)
     if action_type == "escalate_to_human":
-        if state.escalation_required:
+        if state.escalation_required or state.order_value > 1000 or state.customer_tier == "suspicious":
             return True
         if state.issue_type == "refund_request":
             return True
@@ -89,12 +100,20 @@ def is_policy_compliant(action_type: str, state: TicketFlowState) -> bool:
 
 
 def is_harmful_action(action_type: str, state: TicketFlowState) -> bool:
-    if action_type == "approve_refund" and not state.refund_allowed:
-        return True
-    if action_type == "deny_refund" and state.issue_type == "damaged_item" and state.refund_allowed:
-        return True
-    if action_type in {"offer_replacement", "offer_store_credit"} and state.issue_type == "account_access_issue":
-        return True
+    if action_type == "approve_refund":
+        if state.customer_tier == "suspicious": return True
+        if state.order_value > 1000: return True
+        max_days = 60 if state.customer_tier == "vip" else 30
+        if state.order_age_days > max_days: return True
+        if not state.refund_allowed: return True
+    if action_type == "deny_refund":
+        if state.customer_tier == "suspicious" or state.order_value > 1000: return False
+        max_days = 60 if state.customer_tier == "vip" else 30
+        if state.order_age_days <= max_days and state.issue_type == "damaged_item" and state.refund_allowed:
+            return True
+    if action_type in {"offer_replacement", "offer_store_credit"}:
+        if state.customer_tier == "suspicious": return True
+        if state.issue_type == "account_access_issue": return True
     return False
 
 
@@ -131,11 +150,24 @@ def can_close_ticket(state: TicketFlowState) -> bool:
 
 
 def resolution_quality(action_type: str, state: TicketFlowState) -> float:
+    if state.customer_tier == "suspicious" or state.order_value > 1000:
+        if action_type == "escalate_to_human": return 1.0
+        if action_type == "deny_refund": return 0.8
+        return 0.0
+
     if state.issue_type == "damaged_item":
-        return 1.0 if action_type == "approve_refund" else 0.0
+        max_days = 60 if state.customer_tier == "vip" else 30
+        if state.order_age_days <= max_days:
+            return 1.0 if action_type == "approve_refund" else 0.0
+        return 1.0 if action_type in {"offer_store_credit", "deny_refund"} else 0.0
+
     if state.issue_type == "account_access_issue":
         return 1.0 if action_type == "request_more_info" else 0.0
+
     if state.issue_type == "refund_request":
+        max_days = 60 if state.customer_tier == "vip" else 30
+        if state.order_age_days <= max_days and state.refund_allowed:
+            return 1.0 if action_type == "approve_refund" else 0.0
         if action_type in {"deny_refund", "offer_store_credit"}:
             return 1.0
         if action_type == "escalate_to_human":

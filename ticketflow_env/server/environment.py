@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from grader import grade_task
@@ -19,6 +20,8 @@ from policy import (
 from reward import compute_step_reward
 from tasks import AVAILABLE_ACTIONS, MAX_STEPS, TASK_SEQUENCE, get_task
 from ticketflow_env.models import TicketFlowAction, TicketFlowObservation, TicketFlowState, TicketFlowStepResult
+
+_logger = logging.getLogger(__name__)
 
 
 class TicketFlowEnvironment:
@@ -61,6 +64,9 @@ class TicketFlowEnvironment:
             max_steps=MAX_STEPS,
             task_id=task.task_id,
             current_status="open",
+            customer_tier=task.customer_tier,
+            order_value=task.order_value,
+            order_age_days=task.order_age_days,
             last_action_result="Ticket loaded and ready for handling.",
         )
         return self._build_observation()
@@ -110,6 +116,21 @@ class TicketFlowEnvironment:
                 self._state.last_action_result = "Ticket was closed before it was properly resolved."
                 error = "premature_close"
 
+        # Anti-reward-hacking: detect consecutive identical actions
+        # Note: parsed_action is already appended at _action_history[-1],
+        # so [-2] is the previous action. len >= 2 guards first-step edge case.
+        repeated_action = (
+            len(self._action_history) >= 2
+            and self._action_history[-1].action_type == self._action_history[-2].action_type
+        )
+
+        # Build context dict for reward computation (no signature breakage)
+        reward_context = {
+            "step_count": self._state.step_count,
+            "max_steps": self._state.max_steps,
+            "repeated_action": repeated_action,
+        }
+
         reward, reward_details = compute_step_reward(
             valid_action=valid_action,
             correct_classification=correct_classification,
@@ -121,7 +142,9 @@ class TicketFlowEnvironment:
             redundant=redundant,
             unnecessary_escalation=unnecessary_escalation,
             premature_close=premature_close,
+            context=reward_context,
         )
+        reward = max(-1.0, min(1.0, reward))  # defense-in-depth clamp
         self._state.cumulative_reward += reward
         self._state.helpful_reply = self._state.helpful_reply or helpful_reply
 
@@ -133,11 +156,104 @@ class TicketFlowEnvironment:
                 error = "max_steps_reached"
 
         done = bool(self._state.resolved or self._state.failed or self._state.closed)
+
+        # Determine policy rule applied (deterministic decision trace)
+        if not valid_action:
+            policy_applied = "invalid_action"
+        elif harmful:
+            if parsed_action.action_type == "approve_refund":
+                if pre_state.customer_tier == "suspicious":
+                    policy_applied = "fraud_blocked"
+                elif pre_state.order_value > 1000:
+                    policy_applied = "high_value_escalation_required"
+                else:
+                    policy_applied = "refund_denied_outside_window"
+            elif parsed_action.action_type == "deny_refund":
+                policy_applied = "wrongful_denial_blocked"
+            else:
+                policy_applied = "harmful_action_blocked"
+        elif premature_close:
+            policy_applied = "premature_closure_penalty"
+        elif not policy_compliant:
+            policy_applied = "policy_non_compliant"
+        elif parsed_action.action_type == "classify_issue":
+            policy_applied = "issue_classification"
+        elif parsed_action.action_type == "request_more_info":
+            policy_applied = "information_gathering"
+        elif parsed_action.action_type == "approve_refund":
+            if pre_state.customer_tier == "vip":
+                policy_applied = "vip_refund_allowed"
+            else:
+                policy_applied = "standard_refund_allowed"
+        elif parsed_action.action_type == "deny_refund":
+            policy_applied = "refund_denied_policy"
+        elif parsed_action.action_type == "offer_store_credit":
+            policy_applied = "store_credit_alternative"
+        elif parsed_action.action_type == "offer_replacement":
+            policy_applied = "replacement_offered"
+        elif parsed_action.action_type == "escalate_to_human":
+            if pre_state.escalation_required or pre_state.order_value > 1000:
+                policy_applied = "escalation_required"
+            elif pre_state.customer_tier == "suspicious":
+                policy_applied = "fraud_escalation"
+            else:
+                policy_applied = "optional_escalation"
+        elif parsed_action.action_type == "send_customer_reply":
+            policy_applied = "customer_communication"
+        elif parsed_action.action_type == "close_ticket":
+            policy_applied = "ticket_closure"
+        else:
+            policy_applied = "general_workflow"
+
+        # Determine failure reason (if applicable)
+        failure_reason = None
+        if error == "harmful_action":
+            if parsed_action.action_type == "approve_refund":
+                if pre_state.customer_tier == "suspicious":
+                    failure_reason = "refund_not_allowed_for_suspicious_account"
+                elif pre_state.order_value > 1000:
+                    failure_reason = "refund_not_allowed_for_high_value_order"
+                elif pre_state.order_age_days > (60 if pre_state.customer_tier == "vip" else 30):
+                    failure_reason = "refund_outside_allowed_window"
+                else:
+                    failure_reason = "refund_policy_violation"
+            elif parsed_action.action_type == "deny_refund":
+                failure_reason = "wrongful_refund_denial"
+            else:
+                failure_reason = "harmful_action_policy_violation"
+        elif error == "premature_close":
+            failure_reason = "ticket_closed_before_resolution"
+        elif error and "Invalid action_type" in str(error):
+            failure_reason = f"invalid_action_{parsed_action.action_type}"
+        elif error == "max_steps_reached":
+            failure_reason = "exceeded_maximum_steps"
+
         info = {
             "task_id": self._state.task_id,
             "reward_details": reward_details,
             "grading_preview": grade_task(self._state.task_id, self._state, self._action_history),
+            "reward_breakdown": {
+                "classification": reward_details["classification"],
+                "policy_compliance": reward_details["policy_compliance"],
+                "response_quality": reward_details["response_quality"],
+                "efficiency_bonus": reward_details["efficiency_bonus"],
+                "penalty": reward_details["penalty"],
+            },
+            "policy_violations": self._state.policy_violations,
+            "decision_trace": {
+                "last_action": parsed_action.action_type,
+                "policy_applied": policy_applied,
+            },
+            "failure_reason": failure_reason,
         }
+
+        _logger.debug(
+            "step action=%s reward=%.4f done=%s",
+            parsed_action.action_type,
+            reward,
+            done,
+        )
+
         return TicketFlowStepResult(
             observation=self._build_observation(),
             reward=reward,
@@ -174,6 +290,8 @@ class TicketFlowEnvironment:
             self._state.request_more_info_done = True
             self._state.current_status = "awaiting_agent_reply"
             self._state.last_action_result = "Marked ticket as requiring more customer information."
+            if getattr(self._task, "followup_response", None):
+                self._conversation_history.append(f"customer: {self._task.followup_response}")
             return
 
         if action_type in {"approve_refund", "deny_refund", "offer_replacement", "offer_store_credit", "escalate_to_human"}:
@@ -202,9 +320,7 @@ class TicketFlowEnvironment:
             if reply_text:
                 self._conversation_history.append(f"agent: {reply_text}")
             self._state.reply_sent = True
-            if self._state.task_id == "account_access_ambiguity" and (
-                self._state.request_more_info_done or self._state.escalated
-            ):
+            if (self._state.request_more_info_done or self._state.escalated) and self._state.task_id in {"account_access_ambiguity", "incomplete_info"}:
                 self._state.resolved = True
                 self._state.current_status = "waiting_for_customer"
                 self._state.last_action_result = "Reply sent and ticket moved to waiting-for-customer state."
@@ -235,4 +351,6 @@ class TicketFlowEnvironment:
             available_actions=list(AVAILABLE_ACTIONS),
             current_status=self._state.current_status,
             last_action_result=self._state.last_action_result,
+            payment_method=getattr(self._task, "payment_method", None),
+            delivery_partner=getattr(self._task, "delivery_partner", None),
         )

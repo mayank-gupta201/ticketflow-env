@@ -365,7 +365,7 @@ All penalties are deterministic and applied based on environment state, not rand
 TicketFlowEnv evaluates four core agent capabilities:
 
 1. **Policy compliance** — Can the agent follow business rules (refund windows, tier restrictions, escalation requirements) without violating constraints?
-2. **Multi-step reasoning** — Can the agent execute a correct sequence of actions (classify → resolve → reply → close) rather than skipping steps?
+2. **Multi-step reasoning** — Can the agent execute a correct sequence of actions (classify -> resolve -> reply -> close) rather than skipping steps?
 3. **Safety awareness** — Does the agent avoid harmful actions such as approving refunds for suspicious accounts or high-value orders?
 4. **Workflow completion** — Can the agent complete the full ticket lifecycle, including sending a customer reply before closing?
 
